@@ -1,0 +1,69 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #111;
+  color: #fff;
+}
+
+.top-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  z-index: 10;
+}
+
+.top-nav a {
+  color: white;
+  margin-right: 20px;
+  text-decoration: none;
+}
+
+.wallpaper-container {
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+}
+
+.wallpaper {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 1s ease-in-out;
+}
+
+.slot-badge,
+.fullscreen-btn {
+  position: absolute;
+  z-index: 5;
+  background: rgba(0,0,0,0.5);
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.slot-badge { top: 60px; left: 20px; }
+.fullscreen-btn { top: 60px; right: 20px; }
+
+.settings-page {
+  max-width: 900px;
+  margin: 80px auto;
+  padding: 20px;
+}
+
+.slot-card {
+  background: #1e1e1e;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+}
+
+input, textarea, button {
+  width: 100%;
+  margin: 8px 0 16px;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+}

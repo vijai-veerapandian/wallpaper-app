@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="wallpaper-container">
+  <div class="slot-badge">Active slot: {{ active_slot }}</div>
+  <div id="wallpaper" class="wallpaper"></div>
+  <button id="fullscreen-btn" class="fullscreen-btn">Fullscreen</button>
+</div>
+
+<script>
+  window.WALLPAPERS = {{ wallpapers | tojson }};
+  window.ROTATION_SECONDS = {{ rotation_seconds }};
+</script>
+{% endblock %}

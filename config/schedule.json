@@ -1,0 +1,40 @@
+{
+  "slots": {
+    "morning": {
+      "start": "06:00",
+      "end": "11:59",
+      "rotation_seconds": 15,
+      "wallpapers": [
+        "morning/daniel-leone-g30P1zcOzXo-unsplash.jpg",
+        "morning/kalen-emsley-Bkci_8qcdvQ-unsplash.jpg"
+      ]
+    },
+    "afternoon": {
+      "start": "12:00",
+      "end": "16:59",
+      "rotation_seconds": 15,
+      "wallpapers": [
+        "afternoon/philipp-upR8raSXvwg-unsplash.jpg",
+        "afternoon/yousef-espanioly-g1vMcIdygUU-unsplash.jpg"
+      ]
+    },
+    "evening": {
+      "start": "17:00",
+      "end": "20:59",
+      "rotation_seconds": 20,
+      "wallpapers": [
+        "evening/jason-mavrommatis-GPPAjJicemU-unsplash.jpg",
+        "evening/quino-al-mBQIfKlvowM-unsplash.jpg"
+      ]
+    },
+    "night": {
+      "start": "21:00",
+      "end": "05:59",
+      "rotation_seconds": 30,
+      "wallpapers": [
+        "night/johannes-plenio-DKix6Un55mw-unsplash.jpg",
+        "night/nathan-anderson-L95xDkSSuWw-unsplash.jpg"
+      ]
+    }
+  }
+}

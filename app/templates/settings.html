@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-page">
+  <h1>Wallpaper Schedule Settings</h1>
+  <form method="POST">
+    {% for slot_name, slot in schedule.slots.items() %}
+    <section class="slot-card">
+      <h2>{{ slot_name|capitalize }}</h2>
+
+      <label>Start time</label>
+      <input type="time" name="{{ slot_name }}_start" value="{{ slot.start }}">
+
+      <label>End time</label>
+      <input type="time" name="{{ slot_name }}_end" value="{{ slot.end }}">
+
+      <label>Rotation seconds</label>
+      <input type="number" name="{{ slot_name }}_rotation_seconds" value="{{ slot.rotation_seconds }}" min="5">
+
+      <label>Wallpapers (one per line, relative to static/images/)</label>
+      <textarea name="{{ slot_name }}_wallpapers" rows="5">{% for wp in slot.wallpapers %}{{ wp }}
+{% endfor %}</textarea>
+    </section>
+    {% endfor %}
+    <button type="submit">Save schedule</button>
+  </form>
+</div>
+{% endblock %}
