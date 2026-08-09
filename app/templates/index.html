@@ -3,12 +3,11 @@
 {% block content %}
 <div class="wallpaper-container">
   <div class="slot-badge">Active slot: {{ active_slot }}</div>
-  <div id="wallpaper" class="wallpaper"></div>
+  {# Data passed via attributes, not an inline <script>, so the Content-Security-Policy
+     can stay strict. An inline script would force 'unsafe-inline' on script-src. #}
+  <div id="wallpaper" class="wallpaper"
+       data-wallpapers="{{ wallpapers | tojson }}"
+       data-rotation-seconds="{{ rotation_seconds }}"></div>
   <button id="fullscreen-btn" class="fullscreen-btn">Fullscreen</button>
 </div>
-
-<script>
-  window.WALLPAPERS = {{ wallpapers | tojson }};
-  window.ROTATION_SECONDS = {{ rotation_seconds }};
-</script>
 {% endblock %}

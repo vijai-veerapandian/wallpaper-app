@@ -2,10 +2,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const wallpaperEl = document.getElementById("wallpaper");
   const fullscreenBtn = document.getElementById("fullscreen-btn");
 
-  if (!wallpaperEl || !window.WALLPAPERS) return;
+  if (!wallpaperEl) return;
 
-  let wallpapers = window.WALLPAPERS;
-  let rotationSeconds = window.ROTATION_SECONDS || 15;
+  // Read from data attributes rather than window globals set by an inline
+  // <script>, which would require 'unsafe-inline' in the CSP.
+  let wallpapers = [];
+  try {
+    wallpapers = JSON.parse(wallpaperEl.dataset.wallpapers || "[]");
+  } catch (e) {
+    wallpapers = [];
+  }
+
+  let rotationSeconds = Number(wallpaperEl.dataset.rotationSeconds) || 15;
   let currentIndex = 0;
 
   function showWallpaper() {
