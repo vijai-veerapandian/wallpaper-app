@@ -67,6 +67,17 @@ spec:
           ports:
             - name: http
               containerPort: 5000
+          env:
+            # Signs CSRF tokens. Must be stable across restarts and identical
+            # across gunicorn workers, so it cannot be generated in-process.
+            # Created by hand for now; moves into Vault/ESO in Phase 4 Part B.
+            #   kubectl -n wallpaper-app create secret generic wallpaper-app-secret \
+            #     --from-literal=secret-key="$(openssl rand -hex 32)"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wallpaper-app-secret
+                  key: secret-key
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
