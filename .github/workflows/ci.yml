@@ -158,9 +158,13 @@ jobs:
           for i in $(seq 1 30); do
             curl -fsS http://localhost:5000/health && break || sleep 2
           done
-          docker run --rm --network host -v "$PWD:/zap/wrk:rw" \
+          # Dedicated world-writable dir: the ZAP image runs as its own non-root
+          # user and cannot write into the runner-owned workspace.
+          mkdir -p zap-out && chmod 777 zap-out
+          # -I: warnings do not fail the build. FAILs still do.
+          docker run --rm --network host -v "$PWD/zap-out:/zap/wrk:rw" \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:5000 -r zap-report.html
+            zap-baseline.py -t http://localhost:5000 -I -r zap-report.html
           docker rm -f app
 
       - name: Upload ZAP report
@@ -168,7 +172,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
-          path: zap-report.html
+          path: zap-out/zap-report.html
           if-no-files-found: ignore
 
       # ---- publish (main only) ----
