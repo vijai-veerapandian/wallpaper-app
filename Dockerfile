@@ -37,12 +37,20 @@ COPY --chown=app:app app/    ./app/
 COPY --chown=app:app config/ ./config/
 COPY --chown=app:app run.py  ./
 
-USER app
+# Numeric, not `USER app`. With runAsNonRoot the kubelet must confirm the image's
+# user is not root, and it cannot resolve a name — only a UID. A named user fails
+# with "cannot verify user is non-root" unless the pod also sets runAsUser.
+USER 1000:1000
 
 EXPOSE 5000
 
-# --worker-tmp-dir /dev/shm keeps gunicorn's heartbeat files off the root filesystem,
-# which the Deployment mounts read-only.
+# CMD, not ENTRYPOINT: single-purpose image, so `docker run img sh` should just work.
+# Use ENTRYPOINT when the binary is fixed and only its args should change.
+# In k8s: ENTRYPOINT = pod `command:`, CMD = pod `args:`.
+# Exec form (JSON array) is required — shell form makes /bin/sh PID 1, which
+# swallows SIGTERM and blocks graceful shutdown.
+#
+# --worker-tmp-dir /dev/shm keeps gunicorn's heartbeat files off the read-only rootfs.
 CMD ["gunicorn", \
      "--bind", "0.0.0.0:5000", \
      "--workers", "2", \
