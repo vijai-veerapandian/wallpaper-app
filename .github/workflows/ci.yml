@@ -59,7 +59,7 @@ jobs:
         run: black --check app tests
 
       - name: Lint Dockerfile (hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.4.0
         with:
           dockerfile: Dockerfile
           format: sarif
@@ -302,7 +302,7 @@ jobs:
       # Baseline: passive scan plus spider. Fast, safe, low false positives.
       - name: ZAP baseline scan
         if: github.event_name != 'schedule'
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: http://localhost:5000
           cmd_options: "-a"
@@ -312,7 +312,7 @@ jobs:
       # Full scan: active attacks. Slow and noisy, so weekly only.
       - name: ZAP full scan
         if: github.event_name == 'schedule'
-        uses: zaproxy/action-full-scan@v0.12.0
+        uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: http://localhost:5000
           cmd_options: "-a"
