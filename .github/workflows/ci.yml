@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      # Argo CD Image Updater commits only this file; ignoring it stops the
-      # deploy -> CI -> deploy loop. Other manifest changes still trigger a run.
-      - "deploy/kustomization.yaml"
-      - "**.md"
+    # No paths-ignore, deliberately. `main` has branch protection with required
+    # status checks, and a workflow that never triggers reports nothing — so the
+    # check stays permanently pending and the merge is blocked. That would make a
+    # deploy commit (a one-line newTag bump) or a README edit unmergeable.
+    #
+    # To skip expensive jobs for manifest-only changes later, filter at the JOB
+    # level (dorny/paths-filter + `if:`). A skipped job reports as skipped and
+    # satisfies branch protection; a workflow that never runs does not.
   pull_request:
   workflow_dispatch:
   schedule:

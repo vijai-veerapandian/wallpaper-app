@@ -9,8 +9,16 @@ resources:
   - service.yaml
   - httproute.yaml
 
-# Argo CD Image Updater rewrites `newTag` here on each new build and commits it back
-# to this repo. Do not hand-edit while the updater is enabled.
+# This tag IS the deployment. Argo CD watches this file, not the registry — pushing
+# a new image changes nothing until `newTag` here changes and is committed.
+#
+# To deploy:
+#   cd deploy && kustomize edit set image \
+#     ghcr.io/vijai-veerapandian/wallpaper-app=ghcr.io/vijai-veerapandian/wallpaper-app:sha-abc1234
+#   git commit -am "deploy: sha-abc1234" && git push
+#
+# Always an immutable sha- tag, never `latest`: `latest` moves, so git would no
+# longer record what is actually running and rollback would be meaningless.
 images:
   - name: ghcr.io/vijai-veerapandian/wallpaper-app
-    newTag: latest
+    newTag: latest # replaced with sha-<short> on first real deploy
