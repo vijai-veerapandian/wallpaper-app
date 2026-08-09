@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  # Python dependencies
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      # One PR for routine patch/minor bumps. Majors stay separate so breaking
+      # changes get reviewed on their own.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Base image in the Dockerfile — the largest single source of image CVEs.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+
+  # GitHub Actions themselves. The one people forget: a compromised action runs
+  # inside the workflow with its permissions — able to read GITHUB_TOKEN, push
+  # to GHCR, and sign images with the OIDC identity.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        update-types:
+          - minor
+          - patch

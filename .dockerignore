@@ -1,0 +1,37 @@
+# Version control — .git carries full history into the image if copied
+.git
+.gitignore
+.github
+
+# Tests and coverage artifacts
+tests/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+pytest.ini
+
+# Dev-only tooling and config
+requirements-dev.txt
+pyproject.toml
+.flake8
+
+# Kubernetes manifests — deployed by Argo CD, never needed inside the image
+deploy/
+
+# Python bytecode and virtualenvs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Docs and scratch
+README.md
+LICENSE
+file.txt
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+*.swp

@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallpaper-app
+  labels:
+    app.kubernetes.io/name: wallpaper-app
+spec:
+  # Single replica, deliberately. The app persists settings to
+  # config/schedule.json, and the local-path volume backing it is ReadWriteOnce
+  # and node-bound. Two replicas would each hold a private copy and disagree
+  # about the saved schedule depending on which one served the request.
+  # Scaling out requires moving that state to a shared store first.
+  replicas: 1
+  strategy:
+    # Recreate, not RollingUpdate: RWO means the new pod cannot attach the
+    # volume until the old one has released it.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wallpaper-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wallpaper-app
+    spec:
+      # Satisfies Pod Security Admission `restricted` as-is, so the namespace
+      # can be locked down in Phase 10 without revisiting this workload.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        # Seeds the default schedule on first start only. The image's copy lives
+        # at /app/config; the persistent volume is mounted at /data here so the
+        # image copy is not masked. Existing user settings are left alone.
+        - name: seed-config
+          image: ghcr.io/vijai-veerapandian/wallpaper-app:latest
+          command:
+            - sh
+            - -c
+            - "[ -f /data/schedule.json ] || cp /app/config/schedule.json /data/schedule.json"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: config
+              mountPath: /data
+
+      containers:
+        - name: wallpaper-app
+          image: ghcr.io/vijai-veerapandian/wallpaper-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            # Writable config — app/services.py writes schedule.json here.
+            - name: config
+              mountPath: /app/config
+            # readOnlyRootFilesystem is on, so anything touching /tmp needs this.
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: wallpaper-app-config
+        - name: tmp
+          emptyDir: {}

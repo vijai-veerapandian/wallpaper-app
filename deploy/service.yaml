@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallpaper-app
+  labels:
+    app.kubernetes.io/name: wallpaper-app
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: wallpaper-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wallpaper-app-config
+  labels:
+    app.kubernetes.io/name: wallpaper-app
+spec:
+  accessModes:
+    # local-path is node-bound and RWO, which is why the Deployment runs a
+    # single replica. Multiple replicas would each need their own volume and
+    # would diverge on saved settings.
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Mi
+  # Uses the default StorageClass (local-path, from Phase 3).
