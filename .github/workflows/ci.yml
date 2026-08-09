@@ -155,7 +155,7 @@ jobs:
       # Blocks a PR that introduces a vulnerable or badly-licensed dependency.
       - name: Dependency review
         if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
 
