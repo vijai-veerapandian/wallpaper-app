@@ -4,6 +4,9 @@
 <div class="settings-page">
   <h1>Wallpaper Schedule Settings</h1>
   <form method="POST">
+    {# CSRF token. Without it this state-changing POST could be submitted by any
+       page the user visits. Flask-WTF rejects the request if it is missing. #}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% for slot_name, slot in schedule.slots.items() %}
     <section class="slot-card">
       <h2>{{ slot_name|capitalize }}</h2>

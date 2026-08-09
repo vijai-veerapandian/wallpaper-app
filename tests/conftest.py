@@ -56,6 +56,9 @@ def app(tmp_path, sample_schedule):
         {
             "TESTING": True,
             "SCHEDULE_FILE": str(schedule_file),
+            # Tests POST directly and never render the form, so they carry no
+            # token. CSRF is exercised by the DAST stage instead.
+            "WTF_CSRF_ENABLED": False,
         }
     )
 
