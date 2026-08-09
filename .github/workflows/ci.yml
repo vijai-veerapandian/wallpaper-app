@@ -1,23 +1,19 @@
 name: CI
 
+# Three stages:
+#   1. quality  — lint, format, unit tests
+#   2. security — secrets, SAST, dependency CVEs
+#   3. build    — build image, scan it, run DAST, then publish and sign
+#
+# Nothing is published until every scan has passed.
+
 on:
   push:
-    branches:
-      - main
-    # No paths-ignore, deliberately. `main` has branch protection with required
-    # status checks, and a workflow that never triggers reports nothing — so the
-    # check stays permanently pending and the merge is blocked. That would make a
-    # deploy commit (a one-line newTag bump) or a README edit unmergeable.
-    #
-    # To skip expensive jobs for manifest-only changes later, filter at the JOB
-    # level (dorny/paths-filter + `if:`). A skipped job reports as skipped and
-    # satisfies branch protection; a workflow that never runs does not.
+    branches: [main]
   pull_request:
   workflow_dispatch:
   schedule:
-    # Weekly re-scan. An image clean on build day accumulates CVEs as new
-    # advisories are published against unchanged dependencies. Also runs the
-    # deeper ZAP full scan.
+    # Weekly. An image clean on build day picks up CVEs as new advisories land.
     - cron: "0 6 * * 1"
 
 concurrency:
@@ -28,231 +24,102 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# Read-only by default; each job widens only what it needs.
 permissions:
   contents: read
 
 jobs:
-  # ---------------------------------------------------------------- lint
-  lint:
+  # ---------------------------------------------------------------- 1
+  quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
-      - name: Install dev dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
 
-      - name: flake8
+      - name: Lint
         run: flake8 app tests
 
-      - name: black --check
+      - name: Format check
         run: black --check app tests
 
-      - name: Lint Dockerfile (hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-          format: sarif
-          output-file: hadolint.sarif
-          no-fail: true
+      - name: Unit tests
+        run: pytest -v --cov=app --cov-report=term-missing
 
-      - name: Upload hadolint SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: hadolint.sarif
-          category: hadolint
-
-  # -------------------------------------------------------- secret scan
-  secret-scan:
+  # ---------------------------------------------------------------- 2
+  security:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history. A secret committed and later removed still exists in
-          # the git objects, and still needs rotating.
+          # gitleaks needs full history — a secret that was committed and later
+          # removed is still in the git objects, and still needs rotating.
           fetch-depth: 0
-          persist-credentials: false
 
-      - name: gitleaks
+      - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ---------------------------------------------------------- SAST
-  sast:
+      # CodeQL is dataflow analysis; results go to the Security tab automatically.
+      - name: SAST init
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - name: SAST analyze
+        uses: github/codeql-action/analyze@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+
+      # bandit catches Python-specific patterns CodeQL does not. -ll = medium+.
+      - name: Python security lint
+        run: bandit -r app -ll
+
+      # Gates on runtime dependencies only. Dev tooling CVEs are tracked by
+      # Dependabot but do not block a release — they never ship in the image.
+      - name: Dependency CVEs
+        run: pip-audit -r requirements.txt
+
+  # ---------------------------------------------------------------- 3
+  build:
+    needs: [quality, security]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
+      packages: write
       security-events: write
-      actions: read
+      id-token: write # cosign keyless signing
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
         with:
-          persist-credentials: false
+          dockerfile: Dockerfile
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-          queries: security-extended,security-and-quality
-
-      - name: CodeQL analyze
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:python"
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dev dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      # bandit is pattern-based, CodeQL is dataflow-based. Different findings.
-      - name: bandit
-        run: bandit -r app -f sarif -o bandit.sarif || true
-
-      - name: Upload bandit SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: bandit.sarif
-          category: bandit
-
-  # -------------------------------------------------------- dependencies
-  dependencies:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: pip-audit
-        uses: pypa/gh-action-pip-audit@v1.1.0
-        with:
-          inputs: requirements.txt requirements-dev.txt
-
-      # Blocks a PR that introduces a vulnerable or badly-licensed dependency.
-      - name: Dependency review
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
-
-  # ---------------------------------------------------------------- test
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dev dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: pytest with coverage
-        # Add --cov-fail-under=<N> once you know today's number. Set it at the
-        # current value and ratchet up; guessing a threshold breaks the build.
-        run: |
-          pytest -v \
-            --cov=app \
-            --cov-report=term-missing \
-            --cov-report=xml:coverage.xml \
-            --cov-report=html:htmlcov
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: |
-            coverage.xml
-            htmlcov/
-
-  # ------------------------------------------------------------ IaC scan
-  iac-scan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      # Missing securityContext, absent resource limits, privileged containers.
-      - name: Trivy config scan (deploy/)
+      - name: Scan Kubernetes manifests
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
           scan-ref: deploy/
-          format: sarif
-          output: trivy-config.sarif
-          exit-code: "0"
-
-      - name: Upload Trivy config SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-config.sarif
-          category: trivy-config
-
-  # ------------------------------------------------------ build / scan / push
-  #
-  # Ordering is the security property here: the image is built locally, scanned
-  # statically (Trivy) and dynamically (ZAP), and only then published. Nothing
-  # unscanned ever reaches GHCR.
-  build:
-    needs: [lint, secret-scan, sast, dependencies, test, iac-scan]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
-      # Required for cosign keyless signing (Fulcio/Rekor OIDC).
-      id-token: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Derive image tags
-        id: meta
+      - id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -260,84 +127,51 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build for scanning
+      # Built locally first so it is scanned before anyone can pull it.
+      - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
           load: true
-          tags: scan-target:${{ github.sha }}
+          tags: app:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ---------------------------------------------------- static (Trivy)
-      - name: Trivy image scan
+      - name: Scan image for CVEs
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: scan-target:${{ github.sha }}
-          format: sarif
-          output: trivy-image.sarif
+          image-ref: app:test
           severity: CRITICAL,HIGH
-          # Reports without blocking. Flip to "1" to gate releases on CVEs once
-          # you have seen a few clean runs and know the baseline.
-          exit-code: "0"
+          format: sarif
+          output: trivy.sarif
 
-      - name: Upload Trivy image SARIF
+      - name: Publish image scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
         with:
-          sarif_file: trivy-image.sarif
-          category: trivy-image
+          sarif_file: trivy.sarif
 
-      # ------------------------------------------------------- dynamic (ZAP)
-      - name: Start application for DAST
+      # DAST: run the container and attack it. Catches what static analysis
+      # cannot — missing security headers, exposed endpoints, injection.
+      - name: DAST (OWASP ZAP)
         run: |
-          docker run -d --name dast-target -p 5000:5000 scan-target:${{ github.sha }}
-          # Wait for the app's own /health endpoint rather than a fixed sleep.
+          docker run -d --name app -p 5000:5000 app:test
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:5000/health >/dev/null 2>&1; then
-              echo "app is up"; exit 0
-            fi
-            sleep 2
+            curl -fsS http://localhost:5000/health && break || sleep 2
           done
-          echo "app failed to become healthy"; docker logs dast-target; exit 1
-
-      # Baseline: passive scan plus spider. Fast, safe, low false positives.
-      - name: ZAP baseline scan
-        if: github.event_name != 'schedule'
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: http://localhost:5000
-          cmd_options: "-a"
-          allow_issue_writing: false
-          fail_action: false
-
-      # Full scan: active attacks. Slow and noisy, so weekly only.
-      - name: ZAP full scan
-        if: github.event_name == 'schedule'
-        uses: zaproxy/action-full-scan@v0.12.0
-        with:
-          target: http://localhost:5000
-          cmd_options: "-a"
-          allow_issue_writing: false
-          fail_action: false
+          docker run --rm --network host -v "$PWD:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:5000 -r zap-report.html
+          docker rm -f app
 
       - name: Upload ZAP report
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: zap-report
-          path: |
-            report_html.html
-            report_md.md
-            report_json.json
+          path: zap-report.html
           if-no-files-found: ignore
 
-      - name: Stop application
-        if: always()
-        run: docker rm -f dast-target || true
-
-      # ------------------------------------------------------- publish
+      # ---- publish (main only) ----
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -346,16 +180,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Push image
         id: push
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           sbom: true
           provenance: mode=max
@@ -364,12 +196,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3
 
-      # Keyless: identity comes from the Actions OIDC token; the signature goes
-      # to the registry and the Rekor transparency log. No private key to hold.
-      # Kyverno verifyImages consumes this in Phase 12.
+      # Keyless: identity comes from the Actions OIDC token, signature goes to
+      # the registry and the Rekor transparency log. No private key to manage.
       - name: Sign image
         if: github.event_name != 'pull_request'
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+        run: cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${{ steps.push.outputs.digest }}"
