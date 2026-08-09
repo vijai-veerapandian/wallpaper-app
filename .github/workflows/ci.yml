@@ -129,7 +129,7 @@ jobs:
 
       # Built locally first so it is scanned before anyone can pull it.
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -183,7 +183,7 @@ jobs:
       - name: Push image
         id: push
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
