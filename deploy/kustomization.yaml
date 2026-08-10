@@ -21,4 +21,4 @@ resources:
 # longer record what is actually running and rollback would be meaningless.
 images:
   - name: ghcr.io/vijai-veerapandian/wallpaper-app
-    newTag: latest # replaced with sha-<short> on first real deploy
+    newTag: sha-e5cdc22
