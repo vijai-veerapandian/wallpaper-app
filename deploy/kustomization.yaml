@@ -21,4 +21,4 @@ resources:
 # longer record what is actually running and rollback would be meaningless.
 images:
   - name: ghcr.io/vijai-veerapandian/wallpaper-app
-    newTag: sha-e5cdc22
+    newTag: sha-a21f480
