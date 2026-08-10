@@ -9,6 +9,8 @@ interval, editable from the browser.
 Built as the reference workload for an on-premises Kubernetes cluster, so it doubles as a
 worked example of a DevSecOps pipeline: scanned, signed, and deployed by GitOps.
 
+URL: https://wallpaper.k8s.vijaiveerapandian.com
+
 ![wallpaper-app UI](docs/images/wallpaper-app-ui.png)
 
 ---
