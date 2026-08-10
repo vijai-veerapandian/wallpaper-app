@@ -192,6 +192,9 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # org.opencontainers.image.source links the package back to this repo,
+          # so it inherits repo visibility and shows a Source link in the UI.
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           sbom: true
           provenance: mode=max
